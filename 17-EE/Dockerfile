@@ -5,7 +5,6 @@
 # ----------------------------------
 FROM ubuntu:22.04
 
-ARG TARGETPLATFORM
 ARG GRAAL_VERSION=22.3.2
 ARG JAVA_VERSION=17
 
@@ -20,11 +19,7 @@ RUN apt-get update -y \
   && apt-get install -y curl ca-certificates openssl git tar sqlite3 fontconfig tzdata locales iproute2 \
   && echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen \
   && locale-gen en_US.UTF-8 \
-  && case ${TARGETPLATFORM} in \
-         "linux/amd64")  ARCH=linux-amd64  ;; \
-         "linux/arm64")  ARCH=linux-aarch64  ;; \
-    esac \
-  && curl --retry 3 -Lfso /tmp/graalvm.tar.gz https://oca.opensource.oracle.com/gds/GRAALVM_EE_JAVA17_22_3_2/graalvm-ee-java17-${ARCH}-22.3.2.tar.gz \
+  && curl --retry 3 -Lfso /tmp/graalvm.tar.gz https://oca.opensource.oracle.com/gds/GRAALVM_EE_JAVA17_22_3_2/graalvm-ee-java17-linux-amd64-22.3.2.tar.gz \
   && mkdir -p /opt/java/graalvm \
   && cd /opt/java/graalvm \
   && tar -xf /tmp/graalvm.tar.gz --strip-components=1 \
