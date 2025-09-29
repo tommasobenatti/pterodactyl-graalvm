@@ -30,7 +30,6 @@ RUN apt-get update -y \
       locales \
       openssl \
       procps \
-      software-properties-common \
       sqlite3 \
       tar \
       tzdata \
