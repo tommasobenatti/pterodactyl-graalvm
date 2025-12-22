@@ -44,12 +44,40 @@ export TZ
 INTERNAL_IP=$(ip route get 1 | awk '{print $(NF-2);exit}')
 export INTERNAL_IP
 
+
+# 1) If TZ is provided by Wings/Docker, use it.
+# 2) Else try derive from /etc/localtime symlink (common when host mounts it).
+# 3) Else fallback to UTC.
+
+if [ -n "${TZ:-}" ]; then
+  export TZ
+else
+  TZ_DERIVED=""
+  if [ -L /etc/localtime ]; then
+    LINK="$(readlink /etc/localtime 2>/dev/null || true)"
+    case "$LINK" in
+      */usr/share/zoneinfo/*) TZ_DERIVED="${LINK##*/usr/share/zoneinfo/}" ;;
+      */zoneinfo/*)           TZ_DERIVED="${LINK##*/zoneinfo/}" ;;
+    esac
+  fi
+
+  TZ="${TZ_DERIVED:-UTC}"
+  export TZ
+fi
+
+# For display purposes only (avoid failing if file doesn't exist)
+TZ_DISPLAY="${TZ}"
+if [ -f /etc/timezone ]; then
+  TZ_FILE="$(cat /etc/timezone 2>/dev/null || true)"
+  [ -n "$TZ_FILE" ] && TZ_DISPLAY="$TZ_FILE"
+fi
+
 # system informations
 echo -e "${BLUE}---------------------------------------------------------------------${NC}"
 echo -e "${RED}Java GraalVM Image by tommaso.benatti@mcexp.it${NC}"
 echo -e "${BLUE}---------------------------------------------------------------------${NC}"
 echo -e "${YELLOW}Running on Debian: ${RED} $(cat /etc/debian_version)${NC}"
-echo -e "${YELLOW}Current timezone: ${RED} $(cat /etc/timezone)${NC}"
+echo -e "${YELLOW}Current timezone: ${RED} ${TZ_DISPLAY}${NC}"
 echo -e "${YELLOW}Java Version: ${RED} $(java -version) ${NC}"
 echo -e "${BLUE}---------------------------------------------------------------------${NC}"
 
