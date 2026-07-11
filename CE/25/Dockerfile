@@ -6,7 +6,8 @@
   FROM debian:trixie-slim
 
   ARG TARGETPLATFORM
-  ARG JAVA_VERSION=25i1-25.0.3
+  ARG JAVA_VERSION=25
+  ARG BUILD_VERSION=25i1-25.0.3
 
   LABEL maintainer="Tommaso Benatti <tommaso.benatti@outlook.com>"
 
@@ -42,7 +43,7 @@
            "linux/amd64")  ARCH=x64  ;; \
            "linux/arm64")  ARCH=aarch64  ;; \
       esac \
-    && curl --retry 3 -Lfso /tmp/graalvm.tar.gz https://github.com/graalvm/graalvm-ce-builds/releases/download/jdk-${JAVA_VERSION}/graalvm-community-jdk-${JAVA_VERSION}_linux-${ARCH}_bin.tar.gz \
+    && curl --retry 3 -Lfso /tmp/graalvm.tar.gz https://github.com/graalvm/graalvm-ce-builds/releases/download/graal-${JAVA_VERSION}/graalvm-community-jdk-${BUILD_VERSION}_linux-${ARCH}_bin.tar.gz \
     && mkdir -p /opt/java/graalvm \
     && cd /opt/java/graalvm \
     && tar -xf /tmp/graalvm.tar.gz --strip-components=1 \
