@@ -1,60 +1,69 @@
-![Pterodactyl GraalVM](https://user-images.githubusercontent.com/18230443/209179431-6adf6e6c-09fd-4501-b420-90c5b1dd09e1.jpg)
-![build graalvm](https://github.com/tommasobenatti/pterodactyl-graalvm/actions/workflows/docker-image.yml/badge.svg)
+# Pterodactyl Java yolks
+
+![build java yolks](https://github.com/tommasobenatti/pterodactyl-graalvm/actions/workflows/docker-image.yml/badge.svg)
 ![license mit](https://img.shields.io/badge/license-MIT-green)
 
-**GraalVM** is a high-performance JDK that provides significant improvements in application performance and efficiency.  
-It is ideal for **microservices**, **high-load applications**, and **Minecraft servers**.  
-➡️ [Official GraalVM website](https://www.graalvm.org/)
+Java runtime images for Pterodactyl. All published tags target `linux/amd64` and `linux/arm64`, except legacy `CE-8`, whose upstream release is available only for `linux/amd64`.
 
----
+All images include the runtime tools required by the Leaf and Velocity boot updaters: `bash`, `curl`, `jq`, `sed`, and `sha256sum`. Containers run as the unprivileged `container` user in `/home/container`.
 
-## 🔧 Build Types
+## Amazon Corretto tags
 
-- **JDK (Oracle GraalVM JDK)**  
-  Based on **Oracle JDK**, distributed under [GraalVM Free Terms and Conditions](https://www.oracle.com/downloads/licenses/graal-free-license.html).  
-  Includes additional features for **Native Image** (AOT).
+These images are built directly from the official Amazon Corretto archives. Every archive is verified against Amazon's SHA-256 checksum before extraction.
 
-- **CE (Community Edition)**  
-  Based on **OpenJDK**, licensed under **GPLv2 + Classpath Exception**.  
-  Fully open-source and ideal for production Minecraft servers running with **JIT**.
+| Java | Image |
+|------|-------|
+| 8 | `ghcr.io/tommasobenatti/pterodactyl-graalvm:CORRETTO-8` |
+| 11 | `ghcr.io/tommasobenatti/pterodactyl-graalvm:CORRETTO-11` |
+| 15 | `ghcr.io/tommasobenatti/pterodactyl-graalvm:CORRETTO-15` |
+| 16 | `ghcr.io/tommasobenatti/pterodactyl-graalvm:CORRETTO-16` |
+| 17 | `ghcr.io/tommasobenatti/pterodactyl-graalvm:CORRETTO-17` |
+| 18 | `ghcr.io/tommasobenatti/pterodactyl-graalvm:CORRETTO-18` |
+| 19 | `ghcr.io/tommasobenatti/pterodactyl-graalvm:CORRETTO-19` |
+| 20 | `ghcr.io/tommasobenatti/pterodactyl-graalvm:CORRETTO-20` |
+| 21 | `ghcr.io/tommasobenatti/pterodactyl-graalvm:CORRETTO-21` |
+| 22 | `ghcr.io/tommasobenatti/pterodactyl-graalvm:CORRETTO-22` |
+| 23 | `ghcr.io/tommasobenatti/pterodactyl-graalvm:CORRETTO-23` |
+| 24 | `ghcr.io/tommasobenatti/pterodactyl-graalvm:CORRETTO-24` |
+| 25 | `ghcr.io/tommasobenatti/pterodactyl-graalvm:CORRETTO-25` |
+| 26 | `ghcr.io/tommasobenatti/pterodactyl-graalvm:CORRETTO-26` |
 
-- **EE (Enterprise Edition)**  
-  Not available in these builds. Provides enterprise-level optimizations (mainly for Native Image, not relevant for JIT Minecraft servers).
+Amazon does not publish official Corretto builds for Java 9, 10, 12, 13, or 14.
 
----
+For production Minecraft servers, prefer supported LTS releases such as Corretto 21 or Corretto 25. Non-LTS tags are retained for compatibility testing and legacy workloads.
 
-## 📦 Docker Tags
+## Oracle GraalVM JDK tags
 
-| Java | JDK (Oracle GraalVM)                             | CE (Community Edition)                              | EE (Enterprise Edition) |
-|------|--------------------------------------------------|-----------------------------------------------------|--------------------------|
-| 8    | ❌                                               | `ghcr.io/tommasobenatti/pterodactyl-graalvm:CE-8`   | ❌                      |
-| 11   | ❌                                               | `ghcr.io/tommasobenatti/pterodactyl-graalvm:CE-11`  | ❌                      |
-| 17   | `ghcr.io/tommasobenatti/pterodactyl-graalvm:JDK-17` | `ghcr.io/tommasobenatti/pterodactyl-graalvm:CE-17` | ❌                      |
-| 19   | `ghcr.io/tommasobenatti/pterodactyl-graalvm:JDK-19` | `ghcr.io/tommasobenatti/pterodactyl-graalvm:CE-19` | ❌                      |
-| 20   | `ghcr.io/tommasobenatti/pterodactyl-graalvm:JDK-20` | `ghcr.io/tommasobenatti/pterodactyl-graalvm:CE-20` | ❌                      |
-| 21   | `ghcr.io/tommasobenatti/pterodactyl-graalvm:JDK-21` | `ghcr.io/tommasobenatti/pterodactyl-graalvm:CE-21` | ❌                      |
-| 22   | `ghcr.io/tommasobenatti/pterodactyl-graalvm:JDK-22` | `ghcr.io/tommasobenatti/pterodactyl-graalvm:CE-22` | ❌                      |
-| 23   | `ghcr.io/tommasobenatti/pterodactyl-graalvm:JDK-23` | `ghcr.io/tommasobenatti/pterodactyl-graalvm:CE-23` | ❌                      |
-| 24   | `ghcr.io/tommasobenatti/pterodactyl-graalvm:JDK-24` | `ghcr.io/tommasobenatti/pterodactyl-graalvm:CE-24` | ❌                      |
-| 25   | `ghcr.io/tommasobenatti/pterodactyl-graalvm:JDK-25` | `ghcr.io/tommasobenatti/pterodactyl-graalvm:CE-25` | ❌                      |
+| Java | Image |
+|------|-------|
+| 17 | `ghcr.io/tommasobenatti/pterodactyl-graalvm:JDK-17` |
+| 20 | `ghcr.io/tommasobenatti/pterodactyl-graalvm:JDK-20` |
+| 21 | `ghcr.io/tommasobenatti/pterodactyl-graalvm:JDK-21` |
+| 22 | `ghcr.io/tommasobenatti/pterodactyl-graalvm:JDK-22` |
+| 23 | `ghcr.io/tommasobenatti/pterodactyl-graalvm:JDK-23` |
+| 24 | `ghcr.io/tommasobenatti/pterodactyl-graalvm:JDK-24` |
+| 25 | `ghcr.io/tommasobenatti/pterodactyl-graalvm:JDK-25` |
 
----
+There is no `JDK-19` build in this repository.
 
-## 🎮 Recommended Java per Minecraft Version
+`JDK-17` tracks Oracle's supported official container image. `JDK-20`, `JDK-22`, `JDK-23`, and `JDK-24` are end-of-life compatibility images and should not be selected for new production servers. Oracle archive downloads are verified with the published SHA-256 checksum.
 
-| Minecraft Version | Minimum Java | Recommended Java | Suggested Docker Tag |
-|-------------------|--------------|------------------|-----------------------|
-| **1.8 – 1.16**   | Java 8       | Java 11 / 17     | `CE-11` or `CE-17`    |
-| **1.17**         | Java 16      | Java 17          | `CE-17`               |
-| **1.18 – 1.20.4**| Java 17      | Java 17 / 21     | `CE-17` or `CE-21`    |
-| **1.20.5 – 1.21.x** | Java 21   | Java 21          | `CE-21`               |
-| **Future (1.22+)**| TBD (likely 21+) | Java 23 / 25 | `CE-23` or `CE-25`    |
+## GraalVM Community Edition tags
 
----
+Community Edition images are available as `CE-8`, `CE-11`, `CE-17`, and `CE-19` through `CE-25`.
 
-## ⚡ Quick Guide: Enable the Fast Compiler (Graal JIT)
+## Building locally
 
-To run with the Graal just-in-time compiler, add the following flags:
+Build a Corretto image for one platform:
 
 ```bash
--XX:+UnlockExperimentalVMOptions -XX:+UseGraalJIT
+docker buildx build \
+  --platform linux/amd64 \
+  --build-arg JAVA_VERSION=25 \
+  --file CORRETTO/Dockerfile \
+  --tag pterodactyl-corretto:25 \
+  --load \
+  .
+```
+
+The GitHub Actions workflow publishes every configured GraalVM and Corretto tag for both supported architectures on pushes to `master`.

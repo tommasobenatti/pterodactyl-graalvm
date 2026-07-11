@@ -1,75 +1,138 @@
-name: build graalvm
+name: build java yolks
 
 on:
   push:
-    branches: [ "master" ]
+    branches: ["master"]
   pull_request:
-    branches: [ "master" ]
+    branches: ["master"]
+
+permissions:
+  contents: read
+  packages: write
 
 jobs:
-  pterodactyl-graalvm:
+  graalvm:
     name: "pterodactyl-graalvm:${{ matrix.tag }}"
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
+      max-parallel: 4
       matrix:
-        tag:
-          - CE/8
-          - CE/11
-          - CE/17
-          - CE/19
-          - CE/20
-          - CE/21
-          - CE/22
-          - CE/23
-          - CE/24
-          - CE/25
-          #- EE/8
-          #- EE/11
-          #- EE/17
-          - JDK/17
-          - JDK/20
-          - JDK/21
-          - JDK/22
-          - JDK/23
-          - JDK/24
-          - JDK/25
+        include:
+          - path: CE/8
+            tag: CE-8
+            platforms: linux/amd64
+          - path: CE/11
+            tag: CE-11
+          - path: CE/17
+            tag: CE-17
+          - path: CE/19
+            tag: CE-19
+          - path: CE/20
+            tag: CE-20
+          - path: CE/21
+            tag: CE-21
+          - path: CE/22
+            tag: CE-22
+          - path: CE/23
+            tag: CE-23
+          - path: CE/24
+            tag: CE-24
+          - path: CE/25
+            tag: CE-25
+          - path: JDK/17
+            tag: JDK-17
+          - path: JDK/20
+            tag: JDK-20
+          - path: JDK/21
+            tag: JDK-21
+          - path: JDK/22
+            tag: JDK-22
+          - path: JDK/23
+            tag: JDK-23
+          - path: JDK/24
+            tag: JDK-24
+          - path: JDK/25
+            tag: JDK-25
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
-      
+        uses: actions/checkout@v4
+
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-        
+        uses: docker/setup-qemu-action@v3
+
       - name: Set up Docker Buildx
-        id: buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
 
       - name: Login to GHCR
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Docker meta
-        id: meta_graalvm
-        uses: docker/metadata-action@v4
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
         with:
-          # list of Docker images to use as base name for tags
-          images: |
-            ghcr.io/tommasobenatti/pterodactyl-graalvm
-          # generate Docker tags based on the following events/attributes
-          tags: |
-            type=raw,${{ matrix.tag }}
-            
+          images: ghcr.io/tommasobenatti/pterodactyl-graalvm
+          tags: type=raw,value=${{ matrix.tag }}
+
       - name: Build and push
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./${{ matrix.tag }}/Dockerfile
+          file: ./${{ matrix.path }}/Dockerfile
+          platforms: ${{ matrix.platforms || 'linux/amd64,linux/arm64' }}
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=graalvm-${{ matrix.tag }}
+          cache-to: type=gha,mode=max,scope=graalvm-${{ matrix.tag }}
+
+  corretto:
+    name: "pterodactyl-graalvm:CORRETTO-${{ matrix.version }}"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        version: [8, 11, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/tommasobenatti/pterodactyl-graalvm
+          tags: type=raw,value=CORRETTO-${{ matrix.version }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./CORRETTO/Dockerfile
+          build-args: JAVA_VERSION=${{ matrix.version }}
           platforms: linux/amd64,linux/arm64
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta_graalvm.outputs.tags }}
-          labels: ${{ steps.meta_graalvm.outputs.labels }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=corretto-${{ matrix.version }}
+          cache-to: type=gha,mode=max,scope=corretto-${{ matrix.version }}

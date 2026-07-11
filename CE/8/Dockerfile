@@ -25,6 +25,7 @@ RUN apt-get update -y \
       git \
       gnupg2 \
       iproute2 \
+      jq \
       java-common \
       locales \
       openssl \
@@ -38,7 +39,7 @@ RUN apt-get update -y \
       zlib1g-dev \
   && echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen \
   && locale-gen en_US.UTF-8 \
-  && curl --retry 3 -Lfso /tmp/graalvm.tar.gz https://github.com/graalvm/graalvm-ce-builds/releases/download/vm-${GRAAL_VERSION}/graalvm-ce-java${JAVA_VERSION}-linux-amd64-${GRAAL_VERSION}.tar.gz \
+  && curl --retry 3 --retry-all-errors -Lfso /tmp/graalvm.tar.gz https://github.com/graalvm/graalvm-ce-builds/releases/download/vm-${GRAAL_VERSION}/graalvm-ce-java${JAVA_VERSION}-linux-amd64-${GRAAL_VERSION}.tar.gz \
   && mkdir -p /opt/java/graalvm \
   && cd /opt/java/graalvm \
   && tar -xf /tmp/graalvm.tar.gz --strip-components=1 \
@@ -57,6 +58,6 @@ ENV         USER=container HOME=/home/container
 
 WORKDIR     /home/container
 
-COPY        ./../entrypoint.sh /entrypoint.sh
+COPY entrypoint.sh /entrypoint.sh
 
 CMD         ["/bin/bash", "/entrypoint.sh"]

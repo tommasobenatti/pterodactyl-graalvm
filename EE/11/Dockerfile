@@ -26,6 +26,7 @@ RUN apt-get update -y \
       git \
       gnupg2 \
       iproute2 \
+      jq \
       java-common \
       locales \
       openssl \
@@ -62,6 +63,6 @@ ENV         USER=container HOME=/home/container
 
 WORKDIR     /home/container
 
-COPY        ./../entrypoint.sh /entrypoint.sh
+COPY entrypoint.sh /entrypoint.sh
 
 CMD         ["/bin/bash", "/entrypoint.sh"]

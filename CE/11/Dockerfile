@@ -26,6 +26,7 @@ RUN apt-get update -y \
       git \
       gnupg2 \
       iproute2 \
+      jq \
       java-common \
       locales \
       openssl \
@@ -42,8 +43,9 @@ RUN apt-get update -y \
   && case ${TARGETPLATFORM} in \
          "linux/amd64")  ARCH=amd64  ;; \
          "linux/arm64")  ARCH=aarch64  ;; \
+      *) echo "Unsupported TARGETPLATFORM: ${TARGETPLATFORM}" >&2; exit 1 ;; \
     esac \
-  && curl --retry 3 -Lfso /tmp/graalvm.tar.gz https://github.com/graalvm/graalvm-ce-builds/releases/download/vm-${GRAAL_VERSION}/graalvm-ce-java${JAVA_VERSION}-linux-${ARCH}-${GRAAL_VERSION}.tar.gz \
+  && curl --retry 3 --retry-all-errors -Lfso /tmp/graalvm.tar.gz https://github.com/graalvm/graalvm-ce-builds/releases/download/vm-${GRAAL_VERSION}/graalvm-ce-java${JAVA_VERSION}-linux-${ARCH}-${GRAAL_VERSION}.tar.gz \
   && mkdir -p /opt/java/graalvm \
   && cd /opt/java/graalvm \
   && tar -xf /tmp/graalvm.tar.gz --strip-components=1 \
@@ -62,6 +64,6 @@ ENV         USER=container HOME=/home/container
 
 WORKDIR     /home/container
 
-COPY        ./../entrypoint.sh /entrypoint.sh
+COPY entrypoint.sh /entrypoint.sh
 
 CMD         ["/bin/bash", "/entrypoint.sh"]

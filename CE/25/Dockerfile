@@ -7,14 +7,13 @@
 
   ARG TARGETPLATFORM
   ARG JAVA_VERSION=25.1.3
-  ARG BUILD_VERSION=25i1-25.0.3
   LABEL maintainer="Tommaso Benatti <tommaso.benatti@outlook.com>"
 
   ENV DEBIAN_FRONTEND=noninteractive
-  
+
   # Default to UTF-8 file.encoding
   ENV LANG='en_US.UTF-8' LANGUAGE='en_US:en' LC_ALL='en_US.UTF-8'
-  
+
   RUN apt-get update -y \
     && apt-get install -y --no-install-recommends \
         apt-transport-https \
@@ -25,6 +24,7 @@
         git \
         gnupg2 \
         iproute2 \
+        jq \
         java-common \
         locales \
         openssl \
@@ -41,26 +41,27 @@
     && case ${TARGETPLATFORM} in \
            "linux/amd64")  ARCH=x64  ;; \
            "linux/arm64")  ARCH=aarch64  ;; \
+        *) echo "Unsupported TARGETPLATFORM: ${TARGETPLATFORM}" >&2; exit 1 ;; \
       esac \
-    && curl --retry 3 -Lfso /tmp/graalvm.tar.gz https://github.com/graalvm/graalvm-ce-builds/releases/download/graal-${JAVA_VERSION}/graalvm-community-jdk-${BUILD_VERSION}_linux-${ARCH}_bin.tar.gz \
+    && curl --retry 3 --retry-all-errors -Lfso /tmp/graalvm.tar.gz https://github.com/graalvm/graalvm-ce-builds/releases/download/graal-${JAVA_VERSION}/graalvm-community-jdk-${JAVA_VERSION}_linux-${ARCH}_bin.tar.gz \
     && mkdir -p /opt/java/graalvm \
     && cd /opt/java/graalvm \
     && tar -xf /tmp/graalvm.tar.gz --strip-components=1 \
     && export PATH="/opt/java/graalvm/bin:$PATH" \
     && rm -rf /var/lib/apt/lists/* \
     && rm -rf /tmp/graalvm.tar.gz
-  
+
   ENV JAVA_HOME=/opt/java/graalvm \
       PATH="/opt/java/graalvm/bin:$PATH"
-  
+
   # Step 2 - add pterodactyl stuff
   RUN useradd -d /home/container -m container
-  
+
   USER        container
   ENV         USER=container HOME=/home/container
-  
+
   WORKDIR     /home/container
-  
-  COPY        ./../entrypoint.sh /entrypoint.sh
-  
+
+  COPY entrypoint.sh /entrypoint.sh
+
   CMD         ["/bin/bash", "/entrypoint.sh"]

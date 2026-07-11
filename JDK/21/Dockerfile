@@ -15,6 +15,8 @@ ENV DEBIAN_FRONTEND=noninteractive
 # Default to UTF-8 file.encoding
 ENV LANG='en_US.UTF-8' LANGUAGE='en_US:en' LC_ALL='en_US.UTF-8'
 
+COPY scripts/install-oracle-graalvm.sh /usr/local/bin/install-oracle-graalvm
+
 RUN apt-get update -y \
   && apt-get install -y --no-install-recommends \
       apt-transport-https \
@@ -25,6 +27,7 @@ RUN apt-get update -y \
       git \
       gnupg2 \
       iproute2 \
+      jq \
       java-common \
       locales \
       openssl \
@@ -41,8 +44,9 @@ RUN apt-get update -y \
   && case ${TARGETPLATFORM} in \
          "linux/amd64")  ARCH=x64  ;; \
          "linux/arm64")  ARCH=aarch64  ;; \
+      *) echo "Unsupported TARGETPLATFORM: ${TARGETPLATFORM}" >&2; exit 1 ;; \
     esac \
-  && curl --retry 3 -Lfso /tmp/graalvm.tar.gz https://download.oracle.com/graalvm/${JAVA_VERSION}/latest/graalvm-jdk-${JAVA_VERSION}_linux-${ARCH}_bin.tar.gz \
+  && bash /usr/local/bin/install-oracle-graalvm "${JAVA_VERSION}" "${ARCH}" \
   && mkdir -p /opt/java/graalvm \
   && tar -xf /tmp/graalvm.tar.gz -C /opt/java/graalvm --strip-components=1 \
   && rm -rf /var/lib/apt/lists/* \
@@ -59,6 +63,6 @@ ENV         USER=container HOME=/home/container
 
 WORKDIR     /home/container
 
-COPY        ./../entrypoint.sh /entrypoint.sh
+COPY entrypoint.sh /entrypoint.sh
 
 CMD         ["/bin/bash", "/entrypoint.sh"]
