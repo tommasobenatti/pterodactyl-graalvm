@@ -6,9 +6,8 @@
   FROM debian:trixie-slim
 
   ARG TARGETPLATFORM
-  ARG JAVA_VERSION=25
+  ARG JAVA_VERSION=25.1.3
   ARG BUILD_VERSION=25i1-25.0.3
-
   LABEL maintainer="Tommaso Benatti <tommaso.benatti@outlook.com>"
 
   ENV DEBIAN_FRONTEND=noninteractive
