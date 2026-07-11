@@ -6,7 +6,7 @@
   FROM debian:trixie-slim
 
   ARG TARGETPLATFORM
-  ARG JAVA_VERSION=25.0.0
+  ARG JAVA_VERSION=25i1-25.0.3
 
   LABEL maintainer="Tommaso Benatti <tommaso.benatti@outlook.com>"
 
