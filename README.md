@@ -52,9 +52,35 @@ There is no `JDK-19` build in this repository.
 
 Community Edition images are available as `CE-8`, `CE-11`, `CE-17`, and `CE-19` through `CE-25`.
 
-Every CE archive is verified against its official SHA-256 checksum. `CE-25` now uses [GraalVM 25.4.4.1.1](https://github.com/graalvm/graalvm-ce-builds/releases/tag/graal-25.4.4.1.1), including Java 25.0.4.1.1; legacy `CE-8` uses its last published Java 8 archive (GraalVM 21.3.1). The other CE release pins were checked against the upstream release catalog and already identify their newest Java-major-compatible archives.
+Every CE archive is verified against its official SHA-256 checksum. `CE-25` uses GraalVM 25.5.5.0.3 with Java 25.0.5.0.3. Legacy `CE-8` uses its last published Java 8 archive (GraalVM 21.3.1). The remaining pins use the latest archives available for their Java majors. [Upstream CE releases](https://github.com/graalvm/graalvm-ce-builds/releases)
 
-`EE/11` and `EE/17` are legacy source directories, excluded from the publishing workflow and from the eggs. Their dependency lists have also been refreshed; the public supported Oracle runtime tags are `JDK-*`.
+## Oracle GraalVM Early Access tags
+
+The workflow builds one image per upstream EA line for Linux amd64 and arm64. Tags are `EA-22`, `EA-23`, `EA-24`, `EA-25`, `EA-25e1`, `EA-25i1` through `EA-25i6`, and `EA-26`. Each pins the latest snapshot of its line at the time of the refresh in `.github/workflows/docker-image.yml`. Oracle provides these builds for development and testing. [Upstream EA releases](https://github.com/graalvm/oracle-graalvm-ea-builds/releases)
+
+To build any published snapshot, pass its full upstream tag as `GRAALVM_EA_RELEASE`. The installer verifies the SHA-256 published with the matching Linux archive.
+
+```bash
+docker buildx build --pull --no-cache --platform linux/amd64 --load \
+  --file JDK/25/Dockerfile \
+  --build-arg GRAALVM_EA_RELEASE=jdk-25i6-25.0.4.1.1-ea.02 \
+  --tag pterodactyl-graalvm:EA-25i6 .
+```
+
+## Oracle GraalVM Enterprise Edition
+
+Use `EE/11/Dockerfile` or `EE/17/Dockerfile` to build an image from the matching Linux Enterprise Edition Core archive. Download the archive for your Java version and architecture from Oracle under the applicable license. The legacy binaries are restricted under the Oracle Technology Network license, so build locally under your own entitlement. [Oracle Downloads](https://www.oracle.com/downloads/graalvm-downloads.html) · [OTN license](https://www.oracle.com/downloads/licenses/graalvm-otn-license.html)
+
+Put the archive in a directory outside the repository as `graalvm.tar.gz`. Set `GRAALVM_SHA256` to Oracle's published checksum for that archive. This example builds the Java 17 amd64 image.
+
+```bash
+docker buildx build --pull --platform linux/amd64 --load \
+  --file EE/17/Dockerfile \
+  --build-context graalvm=/path/to/oracle-download \
+  --build-arg "GRAALVM_SHA256=$GRAALVM_SHA256" \
+  --tag pterodactyl-graalvm:EE-17 .
+bash scripts/smoke-test-image.sh pterodactyl-graalvm:EE-17 linux/amd64
+```
 
 ## Building locally
 
@@ -71,8 +97,8 @@ docker buildx build \
 
 The GitHub Actions workflow refreshes every configured GraalVM and Corretto tag on pushes to `master`, or through its manual Run workflow action. Builds pull current base images and bypass Docker's build cache so "latest" Java archives are actually downloaded again. Oracle JDK and Corretto images already use their official latest-release URLs; no new major version is substituted for a tag.
 
-Each build first publishes a commit-specific candidate tag. The workflow runs Java, checks the updater tools, tests a JAR archive and exercises the Pterodactyl entrypoint on every supported architecture before promoting the candidate to its normal tag. A failed check leaves the normal tag unchanged. Pull requests test the local amd64 image without publishing. Docker is not installed on the local development host; the actual Linux container checks run in GitHub Actions.
+Each build first publishes a commit-specific candidate tag. The workflow runs Java, checks the updater tools, tests a JAR archive and exercises the Pterodactyl entrypoint on every supported architecture before promoting the candidate to its normal tag. A failed check leaves the normal tag unchanged. Pull requests test the local amd64 image without publishing.
 
-Run `python3 scripts/test-yolks.py` to check all 33 source Dockerfiles, generated Corretto files, and CI refresh/check gates. The regression check initially failed on missing runtime dependencies and passes after the refresh. To use a refreshed image on an existing Pterodactyl server, stop and start it after publication so Wings pulls the new tag. If the egg installation never produced a JAR, correct its settings and reinstall it as well (`MINECRAFT_VERSION=26.3`, `INCLUDE_EXPERIMENTAL=1` for Canvas alpha).
+Run `python3 scripts/test-yolks.py` to check the Dockerfiles, generated Corretto files, Oracle download handling and CI refresh gates. To use a refreshed image on an existing Pterodactyl server, stop and start it after publication so Wings pulls the new tag. If the egg installation never produced a JAR, correct its settings and reinstall it as well (`MINECRAFT_VERSION=26.3`, `INCLUDE_EXPERIMENTAL=1` for Canvas alpha).
 
 Run `node scripts/generate-corretto-dockerfiles.mjs` after changing `CORRETTO/Dockerfile.template` to regenerate every version-specific Dockerfile.

@@ -5,9 +5,8 @@
 # ----------------------------------
 FROM debian:trixie-slim
 
-ARG TARGETPLATFORM
-ARG GRAAL_VERSION=22.3.3
 ARG JAVA_VERSION=11
+ARG GRAALVM_SHA256
 
 LABEL maintainer="Tommaso Benatti <tommaso.benatti@outlook.com>"
 
@@ -40,17 +39,14 @@ RUN apt-get update -y \
       zlib1g-dev \
   && echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen \
   && locale-gen en_US.UTF-8 \
-  && case ${TARGETPLATFORM} in \
-         "linux/amd64")  ARCH=linux-amd64  ;; \
-         "linux/arm64")  ARCH=linux-aarch64  ;; \
-    esac \
-  && curl --retry 3 -Lfso /tmp/graalvm.tar.gz https://oca.opensource.oracle.com/gds/GRAALVM_EE_JAVA11_22_3_3/graalvm-ee-java11-${ARCH}-22.3.3.tar.gz \
+  && rm -rf /var/lib/apt/lists/*
+
+RUN --mount=from=graalvm,target=/mnt/graalvm \
+  test "${#GRAALVM_SHA256}" -eq 64 \
+  && printf '%s  %s\n' "${GRAALVM_SHA256}" /mnt/graalvm/graalvm.tar.gz | sha256sum -c --strict - \
   && mkdir -p /opt/java/graalvm \
-  && cd /opt/java/graalvm \
-  && tar -xf /tmp/graalvm.tar.gz --strip-components=1 \
-  && export PATH="/opt/java/graalvm/bin:$PATH" \
-  && rm -rf /var/lib/apt/lists/* \
-  && rm -rf /tmp/graalvm.tar.gz
+  && tar -xzf /mnt/graalvm/graalvm.tar.gz -C /opt/java/graalvm --strip-components=1 \
+  && grep -q "^JAVA_VERSION=\"${JAVA_VERSION}\." /opt/java/graalvm/release
 
 ENV JAVA_HOME=/opt/java/graalvm \
     PATH="/opt/java/graalvm/bin:$PATH"

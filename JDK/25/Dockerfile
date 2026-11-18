@@ -7,6 +7,7 @@
 
   ARG TARGETPLATFORM
   ARG JAVA_VERSION=25
+  ARG GRAALVM_EA_RELEASE
 
   LABEL maintainer="Tommaso Benatti <tommaso.benatti@outlook.com>"
 
@@ -46,7 +47,7 @@
            "linux/arm64")  ARCH=aarch64  ;; \
         *) echo "Unsupported TARGETPLATFORM: ${TARGETPLATFORM}" >&2; exit 1 ;; \
       esac \
-    && bash /usr/local/bin/install-oracle-graalvm "${JAVA_VERSION}" "${ARCH}" \
+    && bash /usr/local/bin/install-oracle-graalvm "${JAVA_VERSION}" "${ARCH}" "${GRAALVM_EA_RELEASE}" \
     && mkdir -p /opt/java/graalvm \
     && tar -xf /tmp/graalvm.tar.gz -C /opt/java/graalvm --strip-components=1 \
     && rm -rf /var/lib/apt/lists/* \

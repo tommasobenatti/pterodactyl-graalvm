@@ -17,7 +17,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: python3 scripts/test-yolks.py
-      - run: bash -n entrypoint.sh scripts/install-oracle-graalvm.sh scripts/smoke-test-image.sh
+      - run: |
+          for script in entrypoint.sh scripts/*.sh; do
+            bash -n "$script"
+          done
 
   graalvm:
     needs: validate
@@ -63,6 +66,42 @@ jobs:
             tag: JDK-24
           - path: JDK/25
             tag: JDK-25
+          - path: JDK/25
+            tag: EA-22
+            ea_release: jdk-22.0.0-ea.07
+          - path: JDK/25
+            tag: EA-23
+            ea_release: jdk-23.0.0-ea.24
+          - path: JDK/25
+            tag: EA-24
+            ea_release: jdk-24.0.0-ea.35
+          - path: JDK/25
+            tag: EA-25
+            ea_release: jdk-25.0.0-ea.36
+          - path: JDK/25
+            tag: EA-25e1
+            ea_release: jdk-25e1-25.0.3-ea.32
+          - path: JDK/25
+            tag: EA-25i1
+            ea_release: jdk-25i1-25.0.3-ea.33
+          - path: JDK/25
+            tag: EA-25i2
+            ea_release: jdk-25i2-25.0.3-ea.04
+          - path: JDK/25
+            tag: EA-25i3
+            ea_release: jdk-25i3-25.0.4.1.1-ea.05
+          - path: JDK/25
+            tag: EA-25i4
+            ea_release: jdk-25i4-25.0.4.1.1-ea.02
+          - path: JDK/25
+            tag: EA-25i5
+            ea_release: jdk-25i5-25.0.4.1.1-ea.05
+          - path: JDK/25
+            tag: EA-25i6
+            ea_release: jdk-25i6-25.0.4.1.1-ea.02
+          - path: JDK/25
+            tag: EA-26
+            ea_release: jdk-26.0.0-ea.13
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -93,6 +132,7 @@ jobs:
         with:
           context: .
           file: ./${{ matrix.path }}/Dockerfile
+          build-args: ${{ matrix.ea_release && format('GRAALVM_EA_RELEASE={0}', matrix.ea_release) || '' }}
           platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || matrix.platforms || 'linux/amd64,linux/arm64' }}
           load: ${{ github.event_name == 'pull_request' }}
           push: ${{ github.event_name != 'pull_request' }}
