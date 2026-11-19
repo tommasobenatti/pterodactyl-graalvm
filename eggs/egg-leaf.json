@@ -1,0 +1,154 @@
+{
+  "name": "Leaf",
+  "description": "Leaf, a high-performance Paper fork, with a version-selectable and SHA-256-verified boot updater.",
+  "author": "tommasobenatti@users.noreply.github.com",
+  "config": {
+    "files": {
+      "server.properties": {
+        "create_new": true,
+        "parser": "properties",
+        "replace": [
+          {
+            "match": "server-ip",
+            "insert_new": true,
+            "update_existing": true,
+            "if_value": null,
+            "replace_with": "0.0.0.0"
+          },
+          {
+            "match": "server-port",
+            "insert_new": true,
+            "update_existing": true,
+            "if_value": null,
+            "replace_with": "{{server.build.default.port}}"
+          },
+          {
+            "match": "query.port",
+            "insert_new": true,
+            "update_existing": true,
+            "if_value": null,
+            "replace_with": "{{server.build.default.port}}"
+          }
+        ]
+      }
+    },
+    "startup": {
+      "done": [
+        ")! For help, type "
+      ],
+      "strip_ansi": false
+    },
+    "stop": {
+      "type": "command",
+      "value": "stop"
+    }
+  },
+  "scripts": {
+    "installation": {
+      "container": "ghcr.io/pterodactyl/installers:alpine",
+      "entrypoint": "ash",
+      "content": "#!/bin/ash\nset -eu\ncd /mnt/server\nupdate_leaf() {\n  command -v curl >/dev/null 2>&1 && command -v jq >/dev/null 2>&1 && command -v sha256sum >/dev/null 2>&1 || return 1\n  version=\"${MINECRAFT_VERSION}\"\n  if [ \"$version\" = \"latest\" ]; then\n    version=$(curl -fsSL --retry 3 --retry-all-errors --connect-timeout 15 -H \"User-Agent: TommasoBenatti-Pterodactyl-Eggs/1.0 (https://github.com/tommasobenatti)\" \"https://api.leafmc.one/v2/projects/leaf\" | jq -er '.versions[-1]') || return 1\n  fi\n  version_json=$(curl -fsSL --retry 3 --retry-all-errors --connect-timeout 15 -H \"User-Agent: TommasoBenatti-Pterodactyl-Eggs/1.0 (https://github.com/tommasobenatti)\" \"https://api.leafmc.one/v2/projects/leaf/versions/$version\") || return 1\n  build=$(printf '%s' \"$version_json\" | jq -er '.builds | max') || return 1\n  build_json=$(curl -fsSL --retry 3 --retry-all-errors --connect-timeout 15 -H \"User-Agent: TommasoBenatti-Pterodactyl-Eggs/1.0 (https://github.com/tommasobenatti)\" \"https://api.leafmc.one/v2/projects/leaf/versions/$version/builds/$build\") || return 1\n  filename=$(printf '%s' \"$build_json\" | jq -er '.downloads.primary.name') || return 1\n  sha256=$(printf '%s' \"$build_json\" | jq -er '.downloads.primary.sha256') || return 1\n  release=\"$version-$build\"\n  current=$(cat .leaf-build 2>/dev/null || true)\n  if [ \"$current\" = \"$release\" ] && [ -s \"$jar\" ]; then\n    echo \"[Leaf Updater] Build $release is already installed.\"\n    return 0\n  fi\n  url=\"https://api.leafmc.one/v2/projects/leaf/versions/$version/builds/$build/downloads/$filename\"\n  echo \"[Leaf Updater] Downloading Leaf $version build $build...\"\n  curl -fL --retry 3 --retry-all-errors --connect-timeout 15 -H \"User-Agent: TommasoBenatti-Pterodactyl-Eggs/1.0 (https://github.com/tommasobenatti)\" -o \"$jar.download\" \"$url\" || return 1\n  printf '%s  %s\\n' \"$sha256\" \"$jar.download\" | sha256sum -c - >/dev/null || return 1\n  mv -f \"$jar.download\" \"$jar\" || return 1\n  printf '%s\\n' \"$release\" > .leaf-build\n  echo \"[Leaf Updater] Leaf $release installed and SHA-256 verified.\"\n}\njar=\"${SERVER_JARFILE}\"\nif ! update_leaf; then\n  rm -f \"$jar.download\"\n  echo \"[Leaf Installer] ERROR: unable to install Leaf.\"\n  exit 1\nfi\nif [ ! -f server.properties ]; then\n  curl -fL --retry 3 --retry-all-errors --connect-timeout 15 -H \"User-Agent: TommasoBenatti-Pterodactyl-Eggs/1.0 (https://github.com/tommasobenatti)\" -o server.properties \"https://raw.githubusercontent.com/pterodactyl/game-eggs/main/minecraft/java/server.properties\" || true\nfi\nmkdir -p .pterodactyl\ncat > .pterodactyl/leaf-start.sh <<'PTERO_LEAF_START'\n#!/usr/bin/env bash\nset -u\ncd /home/container || exit 1\nupdate_leaf() {\n  command -v curl >/dev/null 2>&1 && command -v jq >/dev/null 2>&1 && command -v sha256sum >/dev/null 2>&1 || return 1\n  version=\"${MINECRAFT_VERSION:-1.21.11}\"\n  if [ \"$version\" = \"latest\" ]; then\n    version=$(curl -fsSL --retry 3 --retry-all-errors --connect-timeout 15 -H \"User-Agent: TommasoBenatti-Pterodactyl-Eggs/1.0 (https://github.com/tommasobenatti)\" \"https://api.leafmc.one/v2/projects/leaf\" | jq -er '.versions[-1]') || return 1\n  fi\n  version_json=$(curl -fsSL --retry 3 --retry-all-errors --connect-timeout 15 -H \"User-Agent: TommasoBenatti-Pterodactyl-Eggs/1.0 (https://github.com/tommasobenatti)\" \"https://api.leafmc.one/v2/projects/leaf/versions/$version\") || return 1\n  build=$(printf '%s' \"$version_json\" | jq -er '.builds | max') || return 1\n  build_json=$(curl -fsSL --retry 3 --retry-all-errors --connect-timeout 15 -H \"User-Agent: TommasoBenatti-Pterodactyl-Eggs/1.0 (https://github.com/tommasobenatti)\" \"https://api.leafmc.one/v2/projects/leaf/versions/$version/builds/$build\") || return 1\n  filename=$(printf '%s' \"$build_json\" | jq -er '.downloads.primary.name') || return 1\n  sha256=$(printf '%s' \"$build_json\" | jq -er '.downloads.primary.sha256') || return 1\n  release=\"$version-$build\"\n  current=$(cat .leaf-build 2>/dev/null || true)\n  if [ \"$current\" = \"$release\" ] && [ -s \"$jar\" ]; then\n    echo \"[Leaf Updater] Build $release is already installed.\"\n    return 0\n  fi\n  url=\"https://api.leafmc.one/v2/projects/leaf/versions/$version/builds/$build/downloads/$filename\"\n  echo \"[Leaf Updater] Downloading Leaf $version build $build...\"\n  curl -fL --retry 3 --retry-all-errors --connect-timeout 15 -H \"User-Agent: TommasoBenatti-Pterodactyl-Eggs/1.0 (https://github.com/tommasobenatti)\" -o \"$jar.download\" \"$url\" || return 1\n  printf '%s  %s\\n' \"$sha256\" \"$jar.download\" | sha256sum -c - >/dev/null || return 1\n  mv -f \"$jar.download\" \"$jar\" || return 1\n  printf '%s\\n' \"$release\" > .leaf-build\n  echo \"[Leaf Updater] Leaf $release installed and SHA-256 verified.\"\n}\njar=\"${SERVER_JARFILE:-server.jar}\"\nauto_update=\"${AUTO_UPDATE:-1}\"\nif [ \"$auto_update\" = \"1\" ] || [ \"$auto_update\" = \"true\" ]; then\n  if ! update_leaf; then\n    rm -f \"$jar.download\"\n    if [ ! -s \"$jar\" ]; then echo \"[Leaf Updater] ERROR: update failed and no runnable JAR exists.\"; exit 1; fi\n    echo \"[Leaf Updater] WARNING: update failed; starting the existing JAR.\"\n  fi\nelse\n  echo \"[Leaf Updater] Automatic updates are disabled.\"\n  if [ ! -s \"$jar\" ]; then\n    echo \"[Leaf Updater] ERROR: $jar does not exist.\"\n    exit 1\n  fi\nfi\nexec java ${JAVA_FLAGS:--Xms128M -XX:MaxRAMPercentage=95.0 -XX:+UseG1GC -XX:+ParallelRefProcEnabled} ${LEAF_FLAGS:--DLeaf.disable-vanilla-profiler=true} -Dterminal.jline=false -Dterminal.ansi=true -jar \"$jar\"\nPTERO_LEAF_START\nchmod 755 .pterodactyl/leaf-start.sh"
+    }
+  },
+  "startup_commands": {
+    "Default": "bash ./.pterodactyl/leaf-start.sh"
+  },
+  "features": [
+    "eula",
+    "java_version",
+    "pid_limit"
+  ],
+  "docker_images": {
+    "GraalVM JDK 21": "ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-JDK-21",
+    "GraalVM JDK 25": "ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-JDK-25",
+    "GraalVM JDK 24": "ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-JDK-24",
+    "GraalVM JDK 23": "ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-JDK-23",
+    "GraalVM JDK 22": "ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-JDK-22",
+    "GraalVM JDK 20": "ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-JDK-20",
+    "GraalVM JDK 17": "ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-JDK-17",
+    "Amazon Corretto 26": "ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-CORRETTO-26",
+    "Amazon Corretto 25": "ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-CORRETTO-25",
+    "Amazon Corretto 24": "ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-CORRETTO-24",
+    "Amazon Corretto 23": "ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-CORRETTO-23",
+    "Amazon Corretto 22": "ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-CORRETTO-22",
+    "Amazon Corretto 21": "ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-CORRETTO-21",
+    "Amazon Corretto 20": "ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-CORRETTO-20",
+    "Amazon Corretto 19": "ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-CORRETTO-19",
+    "Amazon Corretto 18": "ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-CORRETTO-18",
+    "Amazon Corretto 17": "ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-CORRETTO-17",
+    "Amazon Corretto 16": "ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-CORRETTO-16",
+    "Amazon Corretto 15": "ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-CORRETTO-15",
+    "Amazon Corretto 11": "ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-CORRETTO-11",
+    "Amazon Corretto 8": "ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-CORRETTO-8"
+  },
+  "file_denylist": [],
+  "variables": [
+    {
+      "name": "Leaf / Minecraft Version",
+      "description": "Leaf version to track, for example 1.21.11. Use latest to follow Leaf's newest version. At every boot, the latest build of this version is selected.",
+      "env_variable": "MINECRAFT_VERSION",
+      "default_value": "1.21.11",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": [
+        "required",
+        "regex:/^[0-9A-Za-z][0-9A-Za-z._-]{0,31}$/"
+      ],
+      "order": 0
+    },
+    {
+      "name": "Server JAR File",
+      "description": "JAR filename used by the updater and startup command.",
+      "env_variable": "SERVER_JARFILE",
+      "default_value": "server.jar",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": [
+        "required",
+        "regex:/^([\\w\\d._-]+)(\\.jar)$/"
+      ],
+      "order": 1
+    },
+    {
+      "name": "Update on Boot",
+      "description": "Download the latest Leaf build for the selected version before every start. If the API is unavailable, the last verified JAR is retained.",
+      "env_variable": "AUTO_UPDATE",
+      "default_value": "1",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": [
+        "required",
+        "boolean"
+      ],
+      "order": 2
+    },
+    {
+      "name": "JVM Flags",
+      "description": "General JVM flags. Change only if you understand their memory and garbage-collector impact.",
+      "env_variable": "JAVA_FLAGS",
+      "default_value": "-Xms128M -XX:MaxRAMPercentage=95.0 -XX:+UseG1GC -XX:+ParallelRefProcEnabled",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": [
+        "nullable",
+        "string",
+        "max:4096"
+      ],
+      "order": 3
+    },
+    {
+      "name": "Leaf JVM Flags",
+      "description": "Leaf-specific flags from the official documentation. FMA is intentionally not forced because it depends on CPU support.",
+      "env_variable": "LEAF_FLAGS",
+      "default_value": "-DLeaf.disable-vanilla-profiler=true",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": [
+        "nullable",
+        "string",
+        "max:500"
+      ],
+      "order": 4
+    }
+  ]
+}

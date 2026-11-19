@@ -1,0 +1,111 @@
+{
+  "name": "Velocity",
+  "description": "Velocity, the modern Minecraft proxy, with a version/family selector and SHA-256-verified boot updater.",
+  "author": "tommasobenatti@users.noreply.github.com",
+  "config": {
+    "files": {},
+    "startup": {
+      "done": [
+        "Listening on "
+      ],
+      "strip_ansi": false
+    },
+    "stop": {
+      "type": "command",
+      "value": "end"
+    }
+  },
+  "scripts": {
+    "installation": {
+      "container": "ghcr.io/pterodactyl/installers:alpine",
+      "entrypoint": "ash",
+      "content": "#!/bin/ash\nset -eu\ncd /mnt/server\nupdate_velocity() {\n  command -v curl >/dev/null 2>&1 && command -v jq >/dev/null 2>&1 && command -v sha256sum >/dev/null 2>&1 || return 1\n  selector=\"${VELOCITY_VERSION}\"\n  project_json=$(curl -fsSL --retry 3 --retry-all-errors --connect-timeout 15 -H \"User-Agent: TommasoBenatti-Pterodactyl-Eggs/1.0 (https://github.com/tommasobenatti)\" \"https://fill.papermc.io/v3/projects/velocity\") || return 1\n  if [ \"$selector\" = \"latest\" ]; then\n    candidates=$(printf '%s' \"$project_json\" | jq -er '.versions | to_entries[] | .value[]') || return 1\n  elif printf '%s' \"$project_json\" | jq -e --arg selector \"$selector\" '.versions[$selector] != null' >/dev/null; then\n    candidates=$(printf '%s' \"$project_json\" | jq -er --arg selector \"$selector\" '.versions[$selector][]') || return 1\n  else\n    candidates=\"$selector\"\n  fi\n  selected=\"\"\n  for candidate in $candidates; do\n    candidate_builds=$(curl -fsSL --retry 3 --retry-all-errors --connect-timeout 15 -H \"User-Agent: TommasoBenatti-Pterodactyl-Eggs/1.0 (https://github.com/tommasobenatti)\" \"https://fill.papermc.io/v3/projects/velocity/versions/$candidate/builds\") || continue\n    if [ \"$(printf '%s' \"$candidate_builds\" | jq -r 'length')\" -gt 0 ]; then\n      selected=\"$candidate\"\n      builds_json=\"$candidate_builds\"\n      break\n    fi\n  done\n  [ -n \"$selected\" ] || return 1\n  build_json=$(printf '%s' \"$builds_json\" | jq -ec '([.[] | select(.channel == \"STABLE\")][0] // .[0])') || return 1\n  build=$(printf '%s' \"$build_json\" | jq -er '.id') || return 1\n  url=$(printf '%s' \"$build_json\" | jq -er '.downloads[\"server:default\"].url') || return 1\n  sha256=$(printf '%s' \"$build_json\" | jq -er '.downloads[\"server:default\"].checksums.sha256') || return 1\n  release=\"$selected-$build\"\n  current=$(cat .velocity-build 2>/dev/null || true)\n  if [ \"$current\" = \"$release\" ] && [ -s \"$jar\" ]; then\n    echo \"[Velocity Updater] Build $release is already installed.\"\n    return 0\n  fi\n  echo \"[Velocity Updater] Downloading Velocity $selected build $build...\"\n  curl -fL --retry 3 --retry-all-errors --connect-timeout 15 -H \"User-Agent: TommasoBenatti-Pterodactyl-Eggs/1.0 (https://github.com/tommasobenatti)\" -o \"$jar.download\" \"$url\" || return 1\n  printf '%s  %s\\n' \"$sha256\" \"$jar.download\" | sha256sum -c - >/dev/null || return 1\n  mv -f \"$jar.download\" \"$jar\" || return 1\n  printf '%s\\n' \"$release\" > .velocity-build\n  echo \"[Velocity Updater] Velocity $release installed and SHA-256 verified.\"\n}\njar=\"${SERVER_JARFILE}\"\nif ! update_velocity; then\n  rm -f \"$jar.download\"\n  echo \"[Velocity Installer] ERROR: unable to install Velocity.\"\n  exit 1\nfi\nif [ ! -s velocity.toml ]; then\n  curl -fL --retry 3 --retry-all-errors --connect-timeout 15 -H \"User-Agent: TommasoBenatti-Pterodactyl-Eggs/1.0 (https://github.com/tommasobenatti)\" -o velocity.toml \"https://raw.githubusercontent.com/PaperMC/Velocity/dev/3.0.0/proxy/src/main/resources/default-velocity.toml\" || true\nfi\nmkdir -p .pterodactyl\ncat > .pterodactyl/velocity-start.sh <<'PTERO_VELOCITY_START'\n#!/usr/bin/env bash\nset -u\ncd /home/container || exit 1\nupdate_velocity() {\n  command -v curl >/dev/null 2>&1 && command -v jq >/dev/null 2>&1 && command -v sha256sum >/dev/null 2>&1 || return 1\n  selector=\"${VELOCITY_VERSION:-3.0.0}\"\n  project_json=$(curl -fsSL --retry 3 --retry-all-errors --connect-timeout 15 -H \"User-Agent: TommasoBenatti-Pterodactyl-Eggs/1.0 (https://github.com/tommasobenatti)\" \"https://fill.papermc.io/v3/projects/velocity\") || return 1\n  if [ \"$selector\" = \"latest\" ]; then\n    candidates=$(printf '%s' \"$project_json\" | jq -er '.versions | to_entries[] | .value[]') || return 1\n  elif printf '%s' \"$project_json\" | jq -e --arg selector \"$selector\" '.versions[$selector] != null' >/dev/null; then\n    candidates=$(printf '%s' \"$project_json\" | jq -er --arg selector \"$selector\" '.versions[$selector][]') || return 1\n  else\n    candidates=\"$selector\"\n  fi\n  selected=\"\"\n  for candidate in $candidates; do\n    candidate_builds=$(curl -fsSL --retry 3 --retry-all-errors --connect-timeout 15 -H \"User-Agent: TommasoBenatti-Pterodactyl-Eggs/1.0 (https://github.com/tommasobenatti)\" \"https://fill.papermc.io/v3/projects/velocity/versions/$candidate/builds\") || continue\n    if [ \"$(printf '%s' \"$candidate_builds\" | jq -r 'length')\" -gt 0 ]; then\n      selected=\"$candidate\"\n      builds_json=\"$candidate_builds\"\n      break\n    fi\n  done\n  [ -n \"$selected\" ] || return 1\n  build_json=$(printf '%s' \"$builds_json\" | jq -ec '([.[] | select(.channel == \"STABLE\")][0] // .[0])') || return 1\n  build=$(printf '%s' \"$build_json\" | jq -er '.id') || return 1\n  url=$(printf '%s' \"$build_json\" | jq -er '.downloads[\"server:default\"].url') || return 1\n  sha256=$(printf '%s' \"$build_json\" | jq -er '.downloads[\"server:default\"].checksums.sha256') || return 1\n  release=\"$selected-$build\"\n  current=$(cat .velocity-build 2>/dev/null || true)\n  if [ \"$current\" = \"$release\" ] && [ -s \"$jar\" ]; then\n    echo \"[Velocity Updater] Build $release is already installed.\"\n    return 0\n  fi\n  echo \"[Velocity Updater] Downloading Velocity $selected build $build...\"\n  curl -fL --retry 3 --retry-all-errors --connect-timeout 15 -H \"User-Agent: TommasoBenatti-Pterodactyl-Eggs/1.0 (https://github.com/tommasobenatti)\" -o \"$jar.download\" \"$url\" || return 1\n  printf '%s  %s\\n' \"$sha256\" \"$jar.download\" | sha256sum -c - >/dev/null || return 1\n  mv -f \"$jar.download\" \"$jar\" || return 1\n  printf '%s\\n' \"$release\" > .velocity-build\n  echo \"[Velocity Updater] Velocity $release installed and SHA-256 verified.\"\n}\njar=\"${SERVER_JARFILE:-velocity.jar}\"\nauto_update=\"${AUTO_UPDATE:-1}\"\nif [ \"$auto_update\" = \"1\" ] || [ \"$auto_update\" = \"true\" ]; then\n  if ! update_velocity; then\n    rm -f \"$jar.download\"\n    if [ ! -s \"$jar\" ]; then echo \"[Velocity Updater] ERROR: update failed and no runnable JAR exists.\"; exit 1; fi\n    echo \"[Velocity Updater] WARNING: update failed; starting the existing JAR.\"\n  fi\nelse\n  echo \"[Velocity Updater] Automatic updates are disabled.\"\n  if [ ! -s \"$jar\" ]; then\n    echo \"[Velocity Updater] ERROR: $jar does not exist.\"\n    exit 1\n  fi\nfi\nif [ ! -s velocity.toml ]; then\n  curl -fL --retry 3 --retry-all-errors --connect-timeout 15 -H \"User-Agent: TommasoBenatti-Pterodactyl-Eggs/1.0 (https://github.com/tommasobenatti)\" -o velocity.toml \"https://raw.githubusercontent.com/PaperMC/Velocity/dev/3.0.0/proxy/src/main/resources/default-velocity.toml\" || exit 1\nfi\nsed -i -E 's|^bind[[:space:]]*=.*$|bind = \"0.0.0.0:'\"${SERVER_PORT:-25565}\"'\"|' velocity.toml\nexec java ${JAVA_FLAGS:--Xms128M -XX:MaxRAMPercentage=95.0 -XX:+UseG1GC -XX:G1HeapRegionSize=4M -XX:+UnlockExperimentalVMOptions -XX:+ParallelRefProcEnabled -XX:+AlwaysPreTouch -XX:MaxInlineLevel=15} -jar \"$jar\"\nPTERO_VELOCITY_START\nchmod 755 .pterodactyl/velocity-start.sh"
+    }
+  },
+  "startup_commands": {
+    "Default": "bash ./.pterodactyl/velocity-start.sh"
+  },
+  "features": [
+    "java_version",
+    "pid_limit"
+  ],
+  "docker_images": {
+    "GraalVM JDK 21": "ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-JDK-21",
+    "GraalVM JDK 25": "ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-JDK-25",
+    "GraalVM JDK 24": "ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-JDK-24",
+    "GraalVM JDK 23": "ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-JDK-23",
+    "GraalVM JDK 22": "ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-JDK-22",
+    "GraalVM JDK 20": "ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-JDK-20",
+    "GraalVM JDK 17": "ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-JDK-17",
+    "Amazon Corretto 26": "ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-CORRETTO-26",
+    "Amazon Corretto 25": "ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-CORRETTO-25",
+    "Amazon Corretto 24": "ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-CORRETTO-24",
+    "Amazon Corretto 23": "ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-CORRETTO-23",
+    "Amazon Corretto 22": "ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-CORRETTO-22",
+    "Amazon Corretto 21": "ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-CORRETTO-21",
+    "Amazon Corretto 20": "ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-CORRETTO-20",
+    "Amazon Corretto 19": "ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-CORRETTO-19",
+    "Amazon Corretto 18": "ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-CORRETTO-18",
+    "Amazon Corretto 17": "ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-CORRETTO-17",
+    "Amazon Corretto 16": "ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-CORRETTO-16",
+    "Amazon Corretto 15": "ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-CORRETTO-15",
+    "Amazon Corretto 11": "ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-CORRETTO-11",
+    "Amazon Corretto 8": "ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-CORRETTO-8"
+  },
+  "file_denylist": [],
+  "variables": [
+    {
+      "name": "Velocity Version or Family",
+      "description": "Exact version (for example 3.4.0 or 3.6.0-SNAPSHOT), family (3.0.0), or latest. A family follows the newest available version/build in that family.",
+      "env_variable": "VELOCITY_VERSION",
+      "default_value": "3.0.0",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": [
+        "required",
+        "regex:/^[0-9A-Za-z][0-9A-Za-z._-]{0,31}$/"
+      ],
+      "order": 0
+    },
+    {
+      "name": "Velocity JAR File",
+      "description": "JAR filename used by the updater and startup command.",
+      "env_variable": "SERVER_JARFILE",
+      "default_value": "velocity.jar",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": [
+        "required",
+        "regex:/^([\\w\\d._-]+)(\\.jar)$/"
+      ],
+      "order": 1
+    },
+    {
+      "name": "Update on Boot",
+      "description": "Download the latest Velocity build for the selected version/family before every start. If the API is unavailable, the last verified JAR is retained.",
+      "env_variable": "AUTO_UPDATE",
+      "default_value": "1",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": [
+        "required",
+        "boolean"
+      ],
+      "order": 2
+    },
+    {
+      "name": "JVM Flags",
+      "description": "Velocity's recommended G1 flags combined with Pterodactyl-aware memory sizing.",
+      "env_variable": "JAVA_FLAGS",
+      "default_value": "-Xms128M -XX:MaxRAMPercentage=95.0 -XX:+UseG1GC -XX:G1HeapRegionSize=4M -XX:+UnlockExperimentalVMOptions -XX:+ParallelRefProcEnabled -XX:+AlwaysPreTouch -XX:MaxInlineLevel=15",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": [
+        "nullable",
+        "string",
+        "max:500"
+      ],
+      "order": 3
+    }
+  ]
+}

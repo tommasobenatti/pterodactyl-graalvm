@@ -1,0 +1,135 @@
+{
+  "name": "Canvas",
+  "description": "Canvas, a Folia fork, with Minecraft version selection and an atomic boot updater using the official v2 API. Requires Java 25+; plugins must support Folia/Canvas. The API provides no checksum.",
+  "author": "tommasobenatti@users.noreply.github.com",
+  "config": {
+    "files": {
+      "server.properties": {
+        "create_new": true,
+        "parser": "properties",
+        "replace": [
+          {
+            "match": "server-ip",
+            "insert_new": true,
+            "update_existing": true,
+            "if_value": null,
+            "replace_with": "0.0.0.0"
+          },
+          {
+            "match": "server-port",
+            "insert_new": true,
+            "update_existing": true,
+            "if_value": null,
+            "replace_with": "{{server.build.default.port}}"
+          },
+          {
+            "match": "query.port",
+            "insert_new": true,
+            "update_existing": true,
+            "if_value": null,
+            "replace_with": "{{server.build.default.port}}"
+          }
+        ]
+      }
+    },
+    "startup": {
+      "done": [
+        ")! For help, type "
+      ],
+      "strip_ansi": false
+    },
+    "stop": {
+      "type": "command",
+      "value": "stop"
+    }
+  },
+  "scripts": {
+    "installation": {
+      "container": "ghcr.io/pterodactyl/installers:alpine",
+      "entrypoint": "ash",
+      "content": "#!/bin/ash\nset -eu\napk add --no-cache curl jq unzip\ncd /mnt/server\nupdate_canvas() {\n  command -v curl >/dev/null 2>&1 && command -v jq >/dev/null 2>&1 && command -v unzip >/dev/null 2>&1 || {\n    echo \"[Canvas Updater] ERROR: curl, jq and unzip must be installed.\" >&2\n    return 1\n  }\n  version=\"${MINECRAFT_VERSION:-26.2}\"\n  printf '%s' \"$version\" | jq -Re 'test(\"^(latest|[0-9]+(\\\\.[0-9]+){1,2})$\")' >/dev/null || return 1\n  case \"${INCLUDE_EXPERIMENTAL:-0}\" in\n    1|true) experimental=true ;;\n    *) experimental=false ;;\n  esac\n  api=\"https://canvasmc.io/api/v2/builds/latest?project=canvas&experimental=$experimental\"\n  if [ \"$version\" != \"latest\" ]; then api=\"$api&channel=$version\"; fi\n  build_json=$(curl -fsSL --proto '=https' --proto-redir '=https' --retry 3 --retry-all-errors --connect-timeout 15 --max-time 120 -H \"User-Agent: TommasoBenatti-Pterodactyl-Eggs/1.0 (https://github.com/tommasobenatti)\" \"$api\") || {\n    echo \"[Canvas Updater] ERROR: unable to fetch API metadata for Minecraft $version.\" >&2\n    return 1\n  }\n  build_json=$(printf '%s' \"$build_json\" | jq -ec --arg version \"$version\" --argjson experimental \"$experimental\" 'select(.result == \"SUCCESS\" and (.isExperimental == false or ($experimental and .isExperimental == true)) and ($version == \"latest\" or .channelVersion == $version))') || {\n    echo \"[Canvas Updater] ERROR: API returned no usable build for Minecraft $version (experimental=$experimental). Check the version; alpha/beta builds require INCLUDE_EXPERIMENTAL=1.\" >&2\n    return 1\n  }\n  version=$(printf '%s' \"$build_json\" | jq -er '.channelVersion | select(type == \"string\" and test(\"^[0-9]+(\\\\.[0-9]+){1,2}$\"))') || return 1\n  build=$(printf '%s' \"$build_json\" | jq -er '.buildNumber | select(type == \"number\" and . > 0 and floor == .)') || return 1\n  url=$(printf '%s' \"$build_json\" | jq -er '.downloadUrl | select(type == \"string\")') || return 1\n  case \"$url\" in\n    \"https://jenkins.canvasmc.io/job/Canvas/$build/artifact/canvas-server/build/libs/canvas-build.$build.jar\") ;;\n    *) return 1 ;;\n  esac\n  release=\"$version-$build\"\n  current=$(cat .canvas-build 2>/dev/null || true)\n  if [ \"$current\" = \"$release\" ] && [ -s \"$jar\" ]; then\n    echo \"[Canvas Updater] Minecraft $version build $build is already installed.\"\n    return 0\n  fi\n  echo \"[Canvas Updater] Downloading Canvas for Minecraft $version, build $build...\"\n  echo \"[Canvas Updater] $url\"\n  curl -fL --proto '=https' --proto-redir '=https' --retry 3 --retry-all-errors --connect-timeout 15 --max-time 300 -H \"User-Agent: TommasoBenatti-Pterodactyl-Eggs/1.0 (https://github.com/tommasobenatti)\" -o \"$jar.download\" \"$url\" || return 1\n  # Canvas publishes no checksum; check archive integrity before replacing the working JAR.\n  unzip -tq \"$jar.download\" >/dev/null 2>&1 || return 1\n  mv -f \"$jar.download\" \"$jar\" || return 1\n  printf '%s\\n' \"$release\" > .canvas-build || return 1\n  echo \"[Canvas Updater] Canvas $release installed; JAR archive integrity checked.\"\n}\njar=\"${SERVER_JARFILE:-server.jar}\"\ncase \"$jar\" in\n  .*|-*|*[!A-Za-z0-9._-]*|\"\") echo \"[Canvas Installer] ERROR: invalid JAR filename.\"; exit 1 ;;\nesac\nmkdir -p .pterodactyl\ncat > .pterodactyl/canvas-start.sh <<'PTERO_CANVAS_START'\n#!/usr/bin/env bash\nset -u\ncd /home/container || exit 1\nupdate_canvas() {\n  command -v curl >/dev/null 2>&1 && command -v jq >/dev/null 2>&1 && command -v unzip >/dev/null 2>&1 || {\n    echo \"[Canvas Updater] ERROR: curl, jq and unzip must be installed.\" >&2\n    return 1\n  }\n  version=\"${MINECRAFT_VERSION:-26.2}\"\n  printf '%s' \"$version\" | jq -Re 'test(\"^(latest|[0-9]+(\\\\.[0-9]+){1,2})$\")' >/dev/null || return 1\n  case \"${INCLUDE_EXPERIMENTAL:-0}\" in\n    1|true) experimental=true ;;\n    *) experimental=false ;;\n  esac\n  api=\"https://canvasmc.io/api/v2/builds/latest?project=canvas&experimental=$experimental\"\n  if [ \"$version\" != \"latest\" ]; then api=\"$api&channel=$version\"; fi\n  build_json=$(curl -fsSL --proto '=https' --proto-redir '=https' --retry 3 --retry-all-errors --connect-timeout 15 --max-time 120 -H \"User-Agent: TommasoBenatti-Pterodactyl-Eggs/1.0 (https://github.com/tommasobenatti)\" \"$api\") || {\n    echo \"[Canvas Updater] ERROR: unable to fetch API metadata for Minecraft $version.\" >&2\n    return 1\n  }\n  build_json=$(printf '%s' \"$build_json\" | jq -ec --arg version \"$version\" --argjson experimental \"$experimental\" 'select(.result == \"SUCCESS\" and (.isExperimental == false or ($experimental and .isExperimental == true)) and ($version == \"latest\" or .channelVersion == $version))') || {\n    echo \"[Canvas Updater] ERROR: API returned no usable build for Minecraft $version (experimental=$experimental). Check the version; alpha/beta builds require INCLUDE_EXPERIMENTAL=1.\" >&2\n    return 1\n  }\n  version=$(printf '%s' \"$build_json\" | jq -er '.channelVersion | select(type == \"string\" and test(\"^[0-9]+(\\\\.[0-9]+){1,2}$\"))') || return 1\n  build=$(printf '%s' \"$build_json\" | jq -er '.buildNumber | select(type == \"number\" and . > 0 and floor == .)') || return 1\n  url=$(printf '%s' \"$build_json\" | jq -er '.downloadUrl | select(type == \"string\")') || return 1\n  case \"$url\" in\n    \"https://jenkins.canvasmc.io/job/Canvas/$build/artifact/canvas-server/build/libs/canvas-build.$build.jar\") ;;\n    *) return 1 ;;\n  esac\n  release=\"$version-$build\"\n  current=$(cat .canvas-build 2>/dev/null || true)\n  if [ \"$current\" = \"$release\" ] && [ -s \"$jar\" ]; then\n    echo \"[Canvas Updater] Minecraft $version build $build is already installed.\"\n    return 0\n  fi\n  echo \"[Canvas Updater] Downloading Canvas for Minecraft $version, build $build...\"\n  echo \"[Canvas Updater] $url\"\n  curl -fL --proto '=https' --proto-redir '=https' --retry 3 --retry-all-errors --connect-timeout 15 --max-time 300 -H \"User-Agent: TommasoBenatti-Pterodactyl-Eggs/1.0 (https://github.com/tommasobenatti)\" -o \"$jar.download\" \"$url\" || return 1\n  # Canvas publishes no checksum; check archive integrity before replacing the working JAR.\n  unzip -tq \"$jar.download\" >/dev/null 2>&1 || return 1\n  mv -f \"$jar.download\" \"$jar\" || return 1\n  printf '%s\\n' \"$release\" > .canvas-build || return 1\n  echo \"[Canvas Updater] Canvas $release installed; JAR archive integrity checked.\"\n}\njar=\"${SERVER_JARFILE:-server.jar}\"\ncase \"$jar\" in\n  .*|-*|*[!A-Za-z0-9._-]*|\"\") echo \"[Canvas Updater] ERROR: invalid JAR filename.\"; exit 1 ;;\nesac\nauto_update=\"${AUTO_UPDATE:-1}\"\nif [ \"$auto_update\" = \"1\" ] || [ \"$auto_update\" = \"true\" ]; then\n  if ! update_canvas; then\n    rm -f \"$jar.download\"\n    if [ ! -s \"$jar\" ]; then echo \"[Canvas Updater] ERROR: update failed and no runnable JAR exists.\"; exit 1; fi\n    echo \"[Canvas Updater] WARNING: update failed; starting the existing JAR.\"\n  fi\nelse\n  echo \"[Canvas Updater] Automatic updates are disabled.\"\n  if [ ! -s \"$jar\" ]; then echo \"[Canvas Updater] ERROR: $jar does not exist.\"; exit 1; fi\nfi\nexec java ${JAVA_FLAGS:--Xms128M -XX:MaxRAMPercentage=95.0 -XX:+UseG1GC -XX:+ParallelRefProcEnabled --add-modules=jdk.incubator.vector} -Dterminal.jline=false -Dterminal.ansi=true -jar \"$jar\" --nogui\nPTERO_CANVAS_START\nchmod 755 .pterodactyl/canvas-start.sh\nif ! update_canvas; then\n  rm -f \"$jar.download\"\n  echo \"[Canvas Installer] ERROR: unable to install Canvas.\"\n  exit 1\nfi\nif [ ! -f server.properties ]; then\n  curl -fL --retry 3 --retry-all-errors --connect-timeout 15 -H \"User-Agent: TommasoBenatti-Pterodactyl-Eggs/1.0 (https://github.com/tommasobenatti)\" -o server.properties \"https://raw.githubusercontent.com/pterodactyl/game-eggs/main/minecraft/java/server.properties\" || true\nfi"
+    }
+  },
+  "startup_commands": {
+    "Default": "bash ./.pterodactyl/canvas-start.sh"
+  },
+  "features": [
+    "eula",
+    "java_version",
+    "pid_limit"
+  ],
+  "docker_images": {
+    "GraalVM JDK 25": "ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-JDK-25",
+    "Amazon Corretto 26": "ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-CORRETTO-26",
+    "Amazon Corretto 25": "ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-CORRETTO-25"
+  },
+  "file_denylist": [],
+  "variables": [
+    {
+      "name": "Canvas / Minecraft Version",
+      "description": "Minecraft version to track, for example 26.2 or 1.21.11. Use latest to follow the newest permitted version. Alpha/beta versions such as 26.3 require Include Experimental Builds = 1. Each boot logs the version, build number and exact download URL.",
+      "env_variable": "MINECRAFT_VERSION",
+      "default_value": "26.2",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": [
+        "required",
+        "regex:/^[0-9A-Za-z][0-9A-Za-z._-]{0,31}$/"
+      ],
+      "order": 0
+    },
+    {
+      "name": "Server JAR File",
+      "description": "JAR filename used by the updater and startup command.",
+      "env_variable": "SERVER_JARFILE",
+      "default_value": "server.jar",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": [
+        "required",
+        "regex:/^([\\w\\d._-]+)(\\.jar)$/"
+      ],
+      "order": 1
+    },
+    {
+      "name": "Update on Boot",
+      "description": "Download the latest permitted Canvas build for the selected Minecraft version at boot. Failed downloads preserve the existing JAR. ZIP integrity is checked; Canvas publishes no checksum.",
+      "env_variable": "AUTO_UPDATE",
+      "default_value": "1",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": [
+        "required",
+        "boolean"
+      ],
+      "order": 2
+    },
+    {
+      "name": "JVM Flags",
+      "description": "JVM flags with Pterodactyl-aware memory sizing and Canvas's recommended vector module. Requires Java 25 or newer.",
+      "env_variable": "JAVA_FLAGS",
+      "default_value": "-Xms128M -XX:MaxRAMPercentage=95.0 -XX:+UseG1GC -XX:+ParallelRefProcEnabled --add-modules=jdk.incubator.vector",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": [
+        "nullable",
+        "string",
+        "max:500"
+      ],
+      "order": 3
+    },
+    {
+      "name": "Include Experimental Builds",
+      "description": "Set to 1 to permit alpha/beta Canvas builds (required for Minecraft 26.3 while it is experimental). Set to 0 to use stable builds only.",
+      "env_variable": "INCLUDE_EXPERIMENTAL",
+      "default_value": "0",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": [
+        "required",
+        "boolean"
+      ],
+      "order": 4
+    }
+  ]
+}

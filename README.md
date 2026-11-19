@@ -1,9 +1,15 @@
-# Pterodactyl Java yolks
+# Calagopus Java yolks and MCExp eggs
 
-![build java yolks](https://github.com/tommasobenatti/pterodactyl-graalvm/actions/workflows/docker-image.yml/badge.svg)
+![build java yolks](https://github.com/tommasobenatti/pterodactyl-graalvm/actions/workflows/docker-image.yml/badge.svg?branch=calagopus)
 ![license mit](https://img.shields.io/badge/license-MIT-green)
 
-Java runtime images for Pterodactyl. All published tags target `linux/amd64` and `linux/arm64`, except legacy `CE-8`, whose upstream release is available only for `linux/amd64`.
+The `calagopus` branch publishes Java images to the same GHCR package with a `calagopus-` tag prefix. For example, the Calagopus version of `JDK-25` is `ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-JDK-25`. The sections below list the base tags. All published tags target `linux/amd64` and `linux/arm64`, except legacy `CE-8`, whose upstream release is available only for `linux/amd64`.
+
+## MCExp eggs
+
+Import the native [Canvas](eggs/egg-canvas.json), [Leaf](eggs/egg-leaf.json), [Velocity](eggs/egg-velocity.json), and [Velocity-CTD](eggs/egg-velocity-ctd.json) JSON files from the Calagopus admin nest. Each offers the corresponding `calagopus-` image tags. These exports were verified on Calagopus 1.2.10. The four eggs retain their startup commands, runtime scripts, defaults and updater logic.
+
+The Pterodactyl migration imports existing eggs and image selections automatically. Keep those for migrated servers, or apply the native definitions as updates to the corresponding eggs if switching a server to the Calagopus image tags. Existing server volumes already contain their `.pterodactyl/*-start.sh` files when installed with these eggs.
 
 All images explicitly install the runtime tools required by the Leaf, Velocity and Canvas boot updaters: `bash`, `curl`, `jq`, `sed`, `sha256sum` (from `coreutils`), and `unzip`. Installing a package in the egg's Alpine installation container does not add it to the Debian runtime image. Containers run as the unprivileged `container` user in `/home/container`.
 
@@ -95,10 +101,10 @@ docker buildx build \
   .
 ```
 
-The GitHub Actions workflow refreshes every configured GraalVM and Corretto tag on pushes to `master`, or through its manual Run workflow action. Builds pull current base images and bypass Docker's build cache so "latest" Java archives are actually downloaded again. Oracle JDK and Corretto images already use their official latest-release URLs; no new major version is substituted for a tag.
+The GitHub Actions workflow refreshes the Calagopus GraalVM and Corretto tags on pushes to `calagopus`, or through its manual Run workflow action on that branch. Builds pull current base images and bypass Docker's build cache so "latest" Java archives are actually downloaded again. Oracle JDK and Corretto images already use their official latest-release URLs.
 
 Each build first publishes a commit-specific candidate tag. The workflow runs Java, checks the updater tools, tests a JAR archive and exercises the Pterodactyl entrypoint on every supported architecture before promoting the candidate to its normal tag. A failed check leaves the normal tag unchanged. Pull requests test the local amd64 image without publishing.
 
-Run `python3 scripts/test-yolks.py` to check the Dockerfiles, generated Corretto files, Oracle download handling and CI refresh gates. To use a refreshed image on an existing Pterodactyl server, stop and start it after publication so Wings pulls the new tag. If the egg installation never produced a JAR, correct its settings and reinstall it as well (`MINECRAFT_VERSION=26.3`, `INCLUDE_EXPERIMENTAL=1` for Canvas alpha).
+Run `python3 scripts/test-yolks.py` to check the Dockerfiles, generated Corretto files, Oracle download handling, egg image references and CI refresh gates.
 
 Run `node scripts/generate-corretto-dockerfiles.mjs` after changing `CORRETTO/Dockerfile.template` to regenerate every version-specific Dockerfile.

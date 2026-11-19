@@ -3,9 +3,9 @@ name: build java yolks
 on:
   workflow_dispatch:
   push:
-    branches: ["master"]
+    branches: ["calagopus"]
   pull_request:
-    branches: ["master"]
+    branches: ["calagopus"]
 
 permissions:
   contents: read
@@ -125,7 +125,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/tommasobenatti/pterodactyl-graalvm
-          tags: type=raw,value=${{ matrix.tag }}
+          tags: type=raw,value=calagopus-${{ matrix.tag }}
 
       - name: Build candidate
         uses: docker/build-push-action@v6
@@ -188,7 +188,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/tommasobenatti/pterodactyl-graalvm
-          tags: type=raw,value=CORRETTO-${{ matrix.version }}
+          tags: type=raw,value=calagopus-CORRETTO-${{ matrix.version }}
 
       - name: Build candidate
         uses: docker/build-push-action@v6

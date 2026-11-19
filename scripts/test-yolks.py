@@ -1,5 +1,6 @@
 """Check the runtime and release configuration: python3 scripts/test-yolks.py."""
 from hashlib import sha256
+import json
 import os
 from pathlib import Path
 import re
@@ -22,6 +23,17 @@ workflow = (root / '.github/workflows/docker-image.yml').read_text()
 assert workflow.count('no-cache: true') == 2, 'Both image builds must refresh downloaded Java releases'
 assert workflow.count('pull: true') == 2, 'Both image builds must refresh base images'
 assert workflow.count('run: bash scripts/smoke-test-image.sh') == 2, 'Every image must run its runtime checks'
+assert workflow.count('branches: ["calagopus"]') == 2
+assert workflow.count('tags: type=raw,value=calagopus-') == 2
+
+egg_files = sorted((root / 'eggs').glob('egg-*.json'))
+assert len(egg_files) == 4
+image_tags = set(re.findall(r'^\s+tag: (\S+)$', workflow, re.M))
+image_tags.update(f'CORRETTO-{version}' for version in re.search(r'version: \[([\d, ]+)\]', workflow)[1].split(', '))
+for path in egg_files:
+    egg = json.loads(path.read_text())
+    assert all(image.removeprefix('ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-') in image_tags
+               for image in egg['docker_images'].values()), f'{path.name} references an unpublished image'
 
 with TemporaryDirectory() as directory:
     temp = Path(directory)

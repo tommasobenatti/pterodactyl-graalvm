@@ -1,0 +1,93 @@
+{
+  "name": "Velocity-CTD",
+  "description": "Velocity-CTD, derived from the Velocity egg, with GitHub release/build selection and a SHA-256-verified atomic boot updater. Uses the official bootstrap JAR and matching embedded CTD configuration. Requires Java 25+.",
+  "author": "tommasobenatti@users.noreply.github.com",
+  "config": {
+    "files": {},
+    "startup": {
+      "done": [
+        "Listening on "
+      ],
+      "strip_ansi": false
+    },
+    "stop": {
+      "type": "command",
+      "value": "end"
+    }
+  },
+  "scripts": {
+    "installation": {
+      "container": "ghcr.io/pterodactyl/installers:alpine",
+      "entrypoint": "ash",
+      "content": "#!/bin/ash\nset -eu\napk add --no-cache curl jq coreutils unzip\ncd /mnt/server\nupdate_velocity_ctd() {\n  for tool in curl jq sha256sum unzip; do\n    command -v \"$tool\" >/dev/null 2>&1 || { echo \"[Velocity-CTD Updater] ERROR: required tool $tool is missing; pull the refreshed runtime image.\" >&2; return 1; }\n  done\n  selector=\"${CTD_BUILD:-latest}\"\n  printf '%s' \"$selector\" | jq -Re 'test(\"^(latest|[1-9][0-9]{0,8})$\")' >/dev/null || { echo \"[Velocity-CTD Updater] ERROR: CTD_BUILD must be latest or a build number.\" >&2; return 1; }\n  api=\"https://api.github.com/repos/GemstoneGG/Velocity-CTD/releases/latest\"\n  if [ \"$selector\" != \"latest\" ]; then api=\"https://api.github.com/repos/GemstoneGG/Velocity-CTD/releases/tags/build-$selector\"; fi\n  release_json=$(curl -fsSL --proto '=https' --proto-redir '=https' --retry 3 --retry-all-errors --connect-timeout 15 --max-time 120 -H \"User-Agent: TommasoBenatti-Pterodactyl-Eggs/1.0 (https://github.com/tommasobenatti)\" \"$api\") || return 1\n  tag=$(printf '%s' \"$release_json\" | jq -er 'select(.draft == false) | .tag_name | select(type == \"string\" and test(\"^build-[1-9][0-9]{0,8}$\"))') || return 1\n  build=$(printf '%s' \"$tag\" | cut -d- -f2)\n  [ \"$selector\" = \"latest\" ] || [ \"$selector\" = \"$build\" ] || return 1\n  asset=$(printf '%s' \"$release_json\" | jq -ec --arg build \"$build\" '.assets | map(select(.name | test(\"^velocity-ctd-[0-9][0-9A-Za-z._+-]*-\" + $build + \"\\\\.jar$\"))) | select(length == 1) | .[0]') || { echo \"[Velocity-CTD Updater] ERROR: release has no unique bootstrap JAR.\" >&2; return 1; }\n  filename=$(printf '%s' \"$asset\" | jq -er '.name') || return 1\n  version=$(printf '%s' \"$filename\" | jq -Rr --arg build \"$build\" 'sub(\"^velocity-ctd-\"; \"\") | sub(\"-\" + $build + \"\\\\.jar$\"; \"\")') || return 1\n  sha256=$(printf '%s' \"$asset\" | jq -er '.digest | select(type == \"string\" and test(\"^sha256:[0-9a-fA-F]{64}$\")) | sub(\"^sha256:\"; \"\")') || { echo \"[Velocity-CTD Updater] ERROR: GitHub release asset has no valid SHA-256 digest.\" >&2; return 1; }\n  url=$(printf '%s' \"$asset\" | jq -er '.browser_download_url') || return 1\n  [ \"$url\" = \"https://github.com/GemstoneGG/Velocity-CTD/releases/download/$tag/$filename\" ] || return 1\n  current=$(cat .velocity-ctd-build 2>/dev/null || true)\n  if [ \"$current\" = \"$tag\" ] && [ -s \"$jar\" ]; then\n    echo \"[Velocity-CTD Updater] Version $version build $build is already installed.\"\n    return 0\n  fi\n  echo \"[Velocity-CTD Updater] Downloading version $version, build $build...\"\n  echo \"[Velocity-CTD Updater] $url\"\n  curl -fL --proto '=https' --proto-redir '=https' --retry 3 --retry-all-errors --connect-timeout 15 --max-time 300 -H \"User-Agent: TommasoBenatti-Pterodactyl-Eggs/1.0 (https://github.com/tommasobenatti)\" -o \"$jar.download\" \"$url\" || return 1\n  printf '%s  %s\\n' \"$sha256\" \"$jar.download\" | sha256sum -c - >/dev/null || return 1\n  unzip -tq \"$jar.download\" >/dev/null 2>&1 || return 1\n  mv -f \"$jar.download\" \"$jar\" || return 1\n  printf '%s\\n' \"$tag\" > .velocity-ctd-build || return 1\n  echo \"[Velocity-CTD Updater] Version $version build $build installed and SHA-256 verified.\"\n}\njar=\"${SERVER_JARFILE:-velocity.jar}\"\ncase \"$jar\" in\n  .*|-*|*[!A-Za-z0-9._-]*|\"\") echo \"[Velocity-CTD Installer] ERROR: invalid JAR filename.\"; exit 1 ;;\nesac\nmkdir -p .pterodactyl\ncat > .pterodactyl/velocity-ctd-start.sh <<'PTERO_VELOCITY_CTD_START'\n#!/usr/bin/env bash\nset -u\ncd /home/container || exit 1\nupdate_velocity_ctd() {\n  for tool in curl jq sha256sum unzip; do\n    command -v \"$tool\" >/dev/null 2>&1 || { echo \"[Velocity-CTD Updater] ERROR: required tool $tool is missing; pull the refreshed runtime image.\" >&2; return 1; }\n  done\n  selector=\"${CTD_BUILD:-latest}\"\n  printf '%s' \"$selector\" | jq -Re 'test(\"^(latest|[1-9][0-9]{0,8})$\")' >/dev/null || { echo \"[Velocity-CTD Updater] ERROR: CTD_BUILD must be latest or a build number.\" >&2; return 1; }\n  api=\"https://api.github.com/repos/GemstoneGG/Velocity-CTD/releases/latest\"\n  if [ \"$selector\" != \"latest\" ]; then api=\"https://api.github.com/repos/GemstoneGG/Velocity-CTD/releases/tags/build-$selector\"; fi\n  release_json=$(curl -fsSL --proto '=https' --proto-redir '=https' --retry 3 --retry-all-errors --connect-timeout 15 --max-time 120 -H \"User-Agent: TommasoBenatti-Pterodactyl-Eggs/1.0 (https://github.com/tommasobenatti)\" \"$api\") || return 1\n  tag=$(printf '%s' \"$release_json\" | jq -er 'select(.draft == false) | .tag_name | select(type == \"string\" and test(\"^build-[1-9][0-9]{0,8}$\"))') || return 1\n  build=$(printf '%s' \"$tag\" | cut -d- -f2)\n  [ \"$selector\" = \"latest\" ] || [ \"$selector\" = \"$build\" ] || return 1\n  asset=$(printf '%s' \"$release_json\" | jq -ec --arg build \"$build\" '.assets | map(select(.name | test(\"^velocity-ctd-[0-9][0-9A-Za-z._+-]*-\" + $build + \"\\\\.jar$\"))) | select(length == 1) | .[0]') || { echo \"[Velocity-CTD Updater] ERROR: release has no unique bootstrap JAR.\" >&2; return 1; }\n  filename=$(printf '%s' \"$asset\" | jq -er '.name') || return 1\n  version=$(printf '%s' \"$filename\" | jq -Rr --arg build \"$build\" 'sub(\"^velocity-ctd-\"; \"\") | sub(\"-\" + $build + \"\\\\.jar$\"; \"\")') || return 1\n  sha256=$(printf '%s' \"$asset\" | jq -er '.digest | select(type == \"string\" and test(\"^sha256:[0-9a-fA-F]{64}$\")) | sub(\"^sha256:\"; \"\")') || { echo \"[Velocity-CTD Updater] ERROR: GitHub release asset has no valid SHA-256 digest.\" >&2; return 1; }\n  url=$(printf '%s' \"$asset\" | jq -er '.browser_download_url') || return 1\n  [ \"$url\" = \"https://github.com/GemstoneGG/Velocity-CTD/releases/download/$tag/$filename\" ] || return 1\n  current=$(cat .velocity-ctd-build 2>/dev/null || true)\n  if [ \"$current\" = \"$tag\" ] && [ -s \"$jar\" ]; then\n    echo \"[Velocity-CTD Updater] Version $version build $build is already installed.\"\n    return 0\n  fi\n  echo \"[Velocity-CTD Updater] Downloading version $version, build $build...\"\n  echo \"[Velocity-CTD Updater] $url\"\n  curl -fL --proto '=https' --proto-redir '=https' --retry 3 --retry-all-errors --connect-timeout 15 --max-time 300 -H \"User-Agent: TommasoBenatti-Pterodactyl-Eggs/1.0 (https://github.com/tommasobenatti)\" -o \"$jar.download\" \"$url\" || return 1\n  printf '%s  %s\\n' \"$sha256\" \"$jar.download\" | sha256sum -c - >/dev/null || return 1\n  unzip -tq \"$jar.download\" >/dev/null 2>&1 || return 1\n  mv -f \"$jar.download\" \"$jar\" || return 1\n  printf '%s\\n' \"$tag\" > .velocity-ctd-build || return 1\n  echo \"[Velocity-CTD Updater] Version $version build $build installed and SHA-256 verified.\"\n}\njar=\"${SERVER_JARFILE:-velocity.jar}\"\ncase \"$jar\" in\n  .*|-*|*[!A-Za-z0-9._-]*|\"\") echo \"[Velocity-CTD Updater] ERROR: invalid JAR filename.\"; exit 1 ;;\nesac\nauto_update=\"${AUTO_UPDATE:-1}\"\nif [ \"$auto_update\" = \"1\" ] || [ \"$auto_update\" = \"true\" ]; then\n  if ! update_velocity_ctd; then\n    rm -f \"$jar.download\"\n    if [ ! -s \"$jar\" ]; then echo \"[Velocity-CTD Updater] ERROR: update failed and no runnable JAR exists.\"; exit 1; fi\n    echo \"[Velocity-CTD Updater] WARNING: update failed; starting the existing JAR.\"\n  fi\nelse\n  echo \"[Velocity-CTD Updater] Automatic updates are disabled.\"\n  if [ ! -s \"$jar\" ]; then\n    echo \"[Velocity-CTD Updater] ERROR: $jar does not exist.\"\n    exit 1\n  fi\nfi\nprepare_velocity_ctd_config() {\n  [ ! -s velocity.toml ] || return 0\n  mkdir -p .pterodactyl || return 1\n  if ! unzip -p \"$jar\" default-velocity.toml > velocity.toml.download 2>/dev/null; then\n    unzip -p \"$jar\" 'jar-in-jar/velocity-proxy-*.jar' > .pterodactyl/ctd-proxy.jar.download || return 1\n    unzip -p .pterodactyl/ctd-proxy.jar.download default-velocity.toml > velocity.toml.download || return 1\n  fi\n  rm -f .pterodactyl/ctd-proxy.jar.download\n  [ -s velocity.toml.download ] || return 1\n  mv -f velocity.toml.download velocity.toml\n}\nif ! prepare_velocity_ctd_config; then\n  rm -f velocity.toml.download .pterodactyl/ctd-proxy.jar.download\n  echo \"[Velocity-CTD Updater] ERROR: unable to read the default CTD configuration from the JAR.\"\n  exit 1\nfi\nport=\"${SERVER_PORT:-25565}\"\ncase \"$port\" in *[!0-9]*|\"\") echo \"[Velocity-CTD Updater] ERROR: invalid server port.\"; exit 1 ;; esac\n[ \"$port\" -ge 1 ] && [ \"$port\" -le 65535 ] || exit 1\nsed -i -E 's|^bind[[:space:]]*=.*$|bind = \"0.0.0.0:'\"${SERVER_PORT:-25565}\"'\"|' velocity.toml\nexec java ${JAVA_FLAGS:--Xms128M -XX:MaxRAMPercentage=95.0 -XX:+UseG1GC -XX:G1HeapRegionSize=4M -XX:+UnlockExperimentalVMOptions -XX:+ParallelRefProcEnabled -XX:+AlwaysPreTouch -XX:MaxInlineLevel=15} -jar \"$jar\"\nPTERO_VELOCITY_CTD_START\nchmod 755 .pterodactyl/velocity-ctd-start.sh\nprepare_velocity_ctd_config() {\n  [ ! -s velocity.toml ] || return 0\n  mkdir -p .pterodactyl || return 1\n  if ! unzip -p \"$jar\" default-velocity.toml > velocity.toml.download 2>/dev/null; then\n    unzip -p \"$jar\" 'jar-in-jar/velocity-proxy-*.jar' > .pterodactyl/ctd-proxy.jar.download || return 1\n    unzip -p .pterodactyl/ctd-proxy.jar.download default-velocity.toml > velocity.toml.download || return 1\n  fi\n  rm -f .pterodactyl/ctd-proxy.jar.download\n  [ -s velocity.toml.download ] || return 1\n  mv -f velocity.toml.download velocity.toml\n}\nif ! update_velocity_ctd || ! prepare_velocity_ctd_config; then\n  rm -f \"$jar.download\" velocity.toml.download .pterodactyl/ctd-proxy.jar.download\n  echo \"[Velocity-CTD Installer] ERROR: unable to install Velocity-CTD.\"\n  exit 1\nfi"
+    }
+  },
+  "startup_commands": {
+    "Default": "bash ./.pterodactyl/velocity-ctd-start.sh"
+  },
+  "features": [
+    "java_version",
+    "pid_limit"
+  ],
+  "docker_images": {
+    "GraalVM JDK 25": "ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-JDK-25",
+    "Amazon Corretto 26": "ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-CORRETTO-26",
+    "Amazon Corretto 25": "ghcr.io/tommasobenatti/pterodactyl-graalvm:calagopus-CORRETTO-25"
+  },
+  "file_denylist": [],
+  "variables": [
+    {
+      "name": "Velocity-CTD Build",
+      "description": "Use latest to follow the newest GitHub release, or a build number such as 402 to pin it. The updater logs the CTD version, build number and exact JAR URL. Pinned releases must provide a SHA-256 digest.",
+      "env_variable": "CTD_BUILD",
+      "default_value": "latest",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": [
+        "required",
+        "regex:/^[0-9A-Za-z][0-9A-Za-z._-]{0,31}$/"
+      ],
+      "order": 0
+    },
+    {
+      "name": "Velocity-CTD JAR File",
+      "description": "JAR filename used by the updater and startup command.",
+      "env_variable": "SERVER_JARFILE",
+      "default_value": "velocity.jar",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": [
+        "required",
+        "regex:/^([\\w\\d._-]+)(\\.jar)$/"
+      ],
+      "order": 1
+    },
+    {
+      "name": "Update on Boot",
+      "description": "Check GitHub Releases before every start. Failed API requests or invalid downloads preserve the existing JAR. Set to 0 to disable updates.",
+      "env_variable": "AUTO_UPDATE",
+      "default_value": "1",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": [
+        "required",
+        "boolean"
+      ],
+      "order": 2
+    },
+    {
+      "name": "JVM Flags",
+      "description": "Velocity's recommended G1 flags combined with Pterodactyl-aware memory sizing.",
+      "env_variable": "JAVA_FLAGS",
+      "default_value": "-Xms128M -XX:MaxRAMPercentage=95.0 -XX:+UseG1GC -XX:G1HeapRegionSize=4M -XX:+UnlockExperimentalVMOptions -XX:+ParallelRefProcEnabled -XX:+AlwaysPreTouch -XX:MaxInlineLevel=15",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": [
+        "nullable",
+        "string",
+        "max:500"
+      ],
+      "order": 3
+    }
+  ]
+}

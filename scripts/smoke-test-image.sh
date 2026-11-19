@@ -18,5 +18,6 @@ for platform in "${targets[@]}"; do
     unzip -tq /tmp/yolk-check.jar
   '
   docker run --rm --platform "$platform" \
-    -e STARTUP='test "{{HOME}}" = /home/container && printf "Startup expansion OK\n"' "$image"
+    -e SERVER_PORT=25565 -e SERVER_MEMORY=1024 \
+    -e STARTUP='test "{{HOME}}" = /home/container && test "{{SERVER_PORT}}:{{SERVER_MEMORY}}" = 25565:1024 && printf "Startup expansion OK\n"' "$image"
 done
