@@ -24,7 +24,8 @@ with TemporaryDirectory() as directory:
     tools.mkdir()
     (work / "fixture.jar").write_bytes(jar)
     (work / "server.properties").touch()
-    (tools / "curl").write_text(f"#!{sys.executable}\n" + '''+import json, os, pathlib, shutil, sys
+    (tools / "curl").write_text(f"#!{sys.executable}\n" + '''
+import json, os, pathlib, shutil, sys
 args = sys.argv[1:]
 url = args[-1]
 with open("requests.log", "a") as log:
@@ -50,11 +51,13 @@ else:
     def run(script=launcher, metadata=build, **settings):
         (work / "build.json").write_text(json.dumps(metadata))
         (work / "requests.log").write_text("")
-        script = script.replace("cd /home/container", f'cd "{work}"').replace("cd /mnt/server", f'cd "{work}"')
+        container_dir = "/mnt/server" if script == installer else "/home/container"
+        script = script.replace(f"cd {container_dir}", f'cd "{work}"')
         return subprocess.run(["bash"], input=script, text=True, cwd=work, env=dict(env, **settings),
                               capture_output=True)
 
-    assert run().returncode == 0, "Fill v3 should install a missing JAR"
+    result = run()
+    assert result.returncode == 0, result.stdout + result.stderr
     assert (work / "server.jar").read_bytes() == jar
     assert (work / ".leaf-build").read_text().strip() == "26.3-28"
     assert (work / "requests.log").read_text().splitlines() == [f"{origin}/versions/26.3/builds/latest", asset]
@@ -79,7 +82,7 @@ else:
     (work / "server.jar").unlink()
     assert run(TEST_OFFLINE="1").returncode != 0
     assert run(script=installer).returncode == 0
-    assert (work / ".pterodactyl/leaf-start.sh").read_text().replace(str(work), "/home/container") == launcher + "\n"
+    assert (work / ".pterodactyl/leaf-start.sh").read_text() == launcher + "\n"
     assert (work / "server.jar").read_bytes() == jar
 
 print(f"PASS: Fill v3 selection, checksum, fallback and installer ({egg_file.name})")
